@@ -342,7 +342,7 @@ On submit the form POSTs to /api/contact/. Do not log the Brevo SMTP key. Do not
   Reply-To: the visitor’s email address
   If send fails, the form shows: “Your enquiry could not be sent. Please try again.”
   Failed sends log enquiry-mail-fail with SMTP code/status only, never the key.
-  After a successful send, the same enquiry is stored in data/enquiries.json so it also appears in the admin panel.
+  After a successful send the form shows “Your enquiry has been submitted.” even if storing the copy in data/enquiries.json fails. On Vercel the disk is not lasting; mail still goes to neeraj@nzaccountingandtax.org. Locally the enquiry is also stored for the admin panel.
   Verified 15 September 2026: form send succeeded; confirmation “Your enquiry has been submitted.”
 
 Email is sent as HTML plus a plain-text fallback. Labels are bold and 16px; the inputted values beside them stay 14px regular and are not restyled. Omit the NAME line if Your Name is empty. Label is now ACCOUNTING FIRM NAME (not ACCOUTING).
@@ -614,6 +614,7 @@ WORK LOG (13 September 2026)
 - Hydration: SiteChrome uses the server pathname for the first paint, then the client pathname after mount, so the header class names match. html/body have suppressHydrationWarning. #nav-open / #nav-closed no longer use the HTML hidden attribute (1px CSS marks only).
 - Hydration (15 September 2026): overlay pointed at SiteFooter.tsx, then EnquiryForm.tsx. Footer was imported by the client SiteChrome (so it hydrated) and contact rows used display:contents. Footer is now a server slot from layout.tsx; contact rows are direct grid cells. The remaining mismatch was the country-code select: inline SVG style plus the browser restoring a previous value (e.g. India) over the server default New Zealand. Chevron is now in globals.css. The select, email, and phone inputs have suppressHydrationWarning. Copy and numbers unchanged.
 - Admin panel (15 September 2026): VISITORS log is in a fixed-height scroll box so it does not lengthen the page. Email sender panel removed. Do not put that Gmail sender form back. Enquiry delivery stays. Mail still goes through Brevo.
+- Vercel (15 September 2026): live contact form sent mail but showed “Your enquiry could not be sent” because saving data/enquiries.json failed on the read-only serverless disk. Form now succeeds if Brevo accepted the mail. Store the JSON copy only when the disk allows it.
 - Contact form POSTs /api/contact/ via Nodemailer + Brevo SMTP. From display name A&T, to neeraj@nzaccountingandtax.org, replyTo visitor email, subject ENQUIRY from {firm}. Gmail postreqcli sender removed from sending. HTML email structure (bold 16px labels, 14px values) is unchanged.
 - Contact form first failed (15 September 2026) with Brevo 535 Authentication failed because the SMTP username was the From mailbox neeraj@nzaccountingandtax.org. Client supplied BREVO_SMTP_LOGIN=b95d2e001@smtp-brevo.com. SMTP verify succeeded. Live form submit succeeded and showed “Your enquiry has been submitted.” From stays A&T <BREVO_SMTP_USER>. Failures log enquiry-mail-fail without the key. Mailer uses 15s connection/greeting and 20s socket timeouts. Restart Next.js after changing .env.local.
 

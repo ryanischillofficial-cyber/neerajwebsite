@@ -166,7 +166,6 @@ export async function processEnquiry(formData: FormData): Promise<EnquiryState> 
       text: buildEnquiryText(enquiry),
       html: buildEnquiryHtml(enquiry),
     });
-    await addEnquiry(enquiry);
   } catch (error) {
     const code =
       error && typeof error === "object" && "code" in error
@@ -182,6 +181,12 @@ export async function processEnquiry(formData: FormData): Promise<EnquiryState> 
       [code, status].filter(Boolean).join(" "),
     );
     return fail;
+  }
+
+  try {
+    await addEnquiry(enquiry);
+  } catch {
+    /* Mail already sent. Vercel has no lasting disk for data/enquiries.json. */
   }
 
   return { ok: true };
