@@ -1,0 +1,699 @@
+NEERAJ DHANKHAR / NZ ACCOUNTING AND TAX — PROJECT MEMORY
+========================================================
+Last updated: 15 September 2026
+Purpose: Persist every decision, page of copy, and file note so a new chat can continue without prior context. Read this file first. Update it after every meaningful change. Do not invent copy. Follow the user’s words.
+
+Working rule from the client: “Dont use your mind, just listen.” Do not guess biography, awards, years, phone, email, or extra service blurbs. Use only copy the user supplies, or the exact current copy listed below.
+
+--------------------------------------------------------------------------------
+1. WHO / WHAT THIS SITE IS
+--------------------------------------------------------------------------------
+- Person: Neeraj Dhankhar
+- Website name / domain: nzaccountingandtax.org
+- Role shown on the site: Xero Specialist | Accounting & Tax Support for New Zealand Accounting Firms
+- Audience: New Zealand accounting firms (not a general public small-business / personal-tax site)
+- Goal: Tell firms who he is, what he offers, and how to contact him
+- Local folder: C:\Users\Ryan\Desktop\Projects\neerajwebsite
+- In code: site.domain in src/lib/site.ts. layout metadataBase is https://nzaccountingandtax.org
+- The domain is recorded for later deploy / canonical URLs. It is not printed in the header or footer yet (user has not asked to place it there)
+
+--------------------------------------------------------------------------------
+2. NAVIGATION AND URLS
+--------------------------------------------------------------------------------
+Header labels (exact):
+  HOME
+  ABOUT
+  SERVICES
+  CONTACT US          (was CONTACT ME)
+
+Routes (trailingSlash: true in next.config.ts):
+  /                 permanentRedirect (308) to /home/
+  /home/
+  /about/
+  /services/        done — full client copy (see section 7)
+  /contact-us/      done — copy + POST enquiry form (see section 7)
+  /contact-me/      permanentRedirect (308) to /contact-us/; noindex. Keep so old links do not 404.
+  /adm/             hidden admin login. No header, footer, or nav link. robots.txt Disallow. Do not add a public link.
+  /privacy/         Privacy Policy (NZ Privacy Act 2020). Footer link only — not in the header nav.
+  /terms/           Terms of Use. Footer link only — not in the header nav.
+  Generic error and not-found pages do not leak stack traces.
+
+Build order the user set:
+  1. Home       — done
+  2. About      — done (full client copy + ProNeerajPhoto.jpeg in the portrait frame)
+  3. Services   — done (full client copy)
+  4. Contact Us — done (copy + POST form)
+
+--------------------------------------------------------------------------------
+3. TECH STACK
+--------------------------------------------------------------------------------
+- Next.js 16.3.5 App Router, React 19, TypeScript, Tailwind CSS 4
+- Extra dep: nodemailer (Brevo SMTP for enquiry mail and admin password recovery)
+- Scripts: npm run dev (http://localhost:3000) | npm run build | npm start
+- Git was initialised by create-next-app
+- html lang: en-NZ
+- data-scroll-behavior="smooth" on <html>
+- layout.tsx exports viewport: device-width, initialScale 1, viewportFit cover, themeColor #F7F3EB
+- layout.tsx uses generateMetadata (not a static metadata export) so offline mode can set noindex
+- Next.js 16 uses src/proxy.ts (not middleware.ts) to pass pathname and visitor IP
+- SEO: src/app/robots.ts, src/app/sitemap.ts, src/app/opengraph-image.tsx, src/lib/seo.ts, JSON-LD on public pages. Do not put /adm/ in the sitemap. Do not invent extra keywords, blogs, reviews, or service blurbs for ranking.
+- Deploy target not chosen yet. Live name when deployed: nzaccountingandtax.org
+
+--------------------------------------------------------------------------------
+4. DESIGN
+--------------------------------------------------------------------------------
+Tone: warm professional / trusted adviser. Not a dark tech theme.
+
+Palette (src/app/globals.css):
+  Ink navy     #0B1F3A
+  Ink soft     #16345A
+  Paper        #F7F3EB
+  Brass        #B8954A
+  Brass deep   #8F7133
+  Soft cream   #EFE8D8
+  Body         #2C2A26
+  Muted        #5C584F
+  Line         #D8D0BE
+
+Fonts:
+  Headings / A&T mark: Playfair Display (next/font + vendored Regular TTF for the tab icon)
+  Body / nav: Source Sans 3
+
+Logo mark:
+  Text is A&T (changed from ND) in a navy square
+  Component: src/components/LogoMark.tsx
+  shortMark in src/lib/site.ts is "A&T"
+  The Playfair Display ampersand is the intended “&” — keep it
+  Tab icon and Apple icon use the same mark
+    src/app/icon.tsx, src/app/apple-icon.tsx, src/lib/brand-icon.tsx
+  Font file: src/app/fonts/PlayfairDisplay-Regular.ttf (OFL)
+  Default Next.js favicon.ico was deleted so the A&T icon wins
+  Icons metadata: /icon?v=playfair and /apple-icon?v=playfair
+
+Header lockup (all pages) — text beside the logo only:
+  Desktop / tablet (md and up): NZ ACCOUNTING AND TAX SERVICES
+    One uppercase serif line.
+  Phone: NZ A&T SERVICES
+    One uppercase serif line. The “&” is a plain sans “&”, not the Playfair mark.
+  Byline close under that title (all widths):
+    XERO SPECIALIST
+    One neat line. Small sans, uppercase, wide tracking, brass-deep. Same words on phone and desktop — not the old two-line support sentence. Do not put “Accounting & Tax Support for New Zealand Accounting Firms” back in the header. Do not put “Neeraj Dhankhar” or “Xero Specialist |” as the title beside the logo. site.highlight in src/lib/site.ts is “Xero Specialist”; the header shows it as XERO SPECIALIST. The long support line can stay in metadata only.
+  Mobile header (current, real iPhone/Android — keep this):
+    One flex row, locked with inline styles so the logo stays beside the title.
+    Left: A&T mark + NZ A&T SERVICES + one-line XERO SPECIALIST byline.
+    Right: 44px three-line box.
+    Open is an ordinary <a href="#nav-open">. Close is <a href="#nav-closed">.
+    #nav-open and #nav-closed are hidden 1px marks inside .phone-header (not the menu, not the header).
+    CSS :has(#nav-open:target) shows HOME / ABOUT / SERVICES / CONTACT US in flow under the bar.
+    keepPageStill on those two links restores scrollX/scrollY so the page does not slide.
+    html:has(#nav-open:target) and html:has(#nav-closed:target) set scroll-behavior: auto.
+    Hash is cleared only when the pathname changes (not on first paint, or a late hydrate closes the menu).
+    SiteChrome paints the header from the server pathname first, then the client pathname after mount, so hydration class names match. Do not go back to usePathname() for the first header render.
+    SiteFooter is passed from the server layout into SiteChrome (not imported by the client file), so the footer is not a hydrating Client Component. Footer phone/email rows are direct CSS grid cells. Do not wrap those rows in display:contents — that mismatch showed as “A tree hydrated but some attributes…” at SiteFooter.tsx.
+    Contact form country-code select must not use an inline backgroundImage style. Chevron is .enquiry-country-code in globals.css. Select/email/phone may have suppressHydrationWarning because the browser can restore a previous value over the server HTML.
+    Ordinary <a href> for HOME / ABOUT / SERVICES / CONTACT US. Desktop nav is unchanged (md+).
+    Active nav item: brass underline.
+    Real-device check is often http://192.168.1.3:3000/home/. Phones cache hard — close the tab fully and reopen; pull-to-refresh is not enough.
+  Phone menu — do not put these back (they failed on a real phone or the user rejected them):
+    Do not use <input type="checkbox">. iPhone/Android still draw a native tick/circle even if the input is hidden.
+    Do not use <details>/<summary>. Safari shows a small arrow and can push the icon off-screen.
+    Do not use React useState + button onClick / pointer / touch to open the menu. Laptop-narrow worked; the real phone did not, or it opened then closed.
+    Do not use ?menu=1 (or any query) to open the menu. User rejected that.
+    Do not put :target on the visible nav or on the header (#phone-menu / #site-top). That made the page slide up and down.
+    Do not use #show-menu on a parent that changes the header layout. That stacked the logo and left the list stuck open.
+    Do not put overflow-x: clip on html/body. Clip sideways scroll on main only.
+    Do not use position:fixed for the menu list.
+
+Mobile / phone (Android and iOS):
+  Viewport is device-width, initial-scale 1, viewport-fit cover, theme color paper (#F7F3EB).
+  Pages must not scroll sideways. Inputs are 16px so iOS does not zoom on focus.
+  Public buttons and footer icons are at least 44px on small screens (footer icons stay 28px from md up).
+  Home hero buttons and the Ready to connect button are full width on phones, then the usual equal pair from sm up.
+  Contact country-code select shows a chevron so it is obviously a dropdown on iOS.
+  Admin visitor table scrolls sideways inside its box. Admin header buttons stack full width on phones.
+  Construction heading wraps on a narrow screen. Safe-area insets are respected.
+
+Footer (all pages) — exact copy:
+  Neeraj Dhankhar
+  NZ Accounting & Tax Services Contractor
+  B.Com | Provisional Member – CA ANZ | Xero Specialist
+  +640223176728 — icon-only WhatsApp → https://wa.me/640223176728
+  +918826966728 — icon-only Call → tel:+918826966728 and WhatsApp → https://wa.me/918826966728
+  neeraj@nzaccountingandtax.org — icon-only Email → mailto:neeraj@nzaccountingandtax.org
+  Accounting and Tax Services
+    Very small muted line under the two columns, below everything else. Exact words; “and”, not “&”.
+  Privacy Policy → /privacy/ and Terms of Use → /terms/ sit on the same row (right on desktop). Not in the header nav.
+  Ampersand in the contractor line is a plain sans “&”, not Playfair.
+  Layout: name/credentials left. Contacts sit on the far right (justify-between), not mid-footer. Contact value beside small icon-only buttons (no WhatsApp/Call/Email text on the buttons). Buttons are 44px squares on phones and 28px from md up, vertically centered on their number or email. The action column right-aligns so WhatsApp/Email icons stack. Labels stay on aria-label only.
+  Footer spelling is “CA ANZ” (space), not “CAANZ”. Do not write CAANZ.
+
+Removed from the site (do not put back unless the user asks):
+  “Chartered Accountant · New Zealand”
+  “The practice” side card
+  “A brief introduction” label
+  “How I can help”
+  Invented Home service teasers (Tax & compliance / Business support / Personal advice cards)
+  Numbered 01–05 on the service cards
+  “Services at a glance” (label is now SERVICES)
+  “© 2026 Neeraj Dhankhar. Contact”
+  Old Home hero intro (three paragraphs — do not restore):
+    I am a Xero Specialist providing practical accounting and tax support to New Zealand accounting firms. Working primarily within Xero on a fixed-fee basis, I prepare annual financial statements and tax returns for practice clients.
+    Drawing on practical experience gained in New Zealand, I help firms navigate busy periods or manage ongoing workloads based on their specific requirements.
+    This site outlines the services I offer and how to get in touch. My approach is straightforward: numbers stay in order, clear explanations replace jargon, and every conversation ends with an actionable next step.
+  Footer button labels “WhatsApp”, “Call”, “Email” as visible text (icons only now)
+  Footer spelling “CAANZ” (now “CA ANZ”)
+  Home H1 “Neeraj Dhankhar”, later “Accounting and Tax Services”, then “NZ Accounting and Tax Services” (now “NZ ACCOUNTING AND TAX SERVICES”)
+  Header lockup “Neeraj Dhankhar” + Xero Specialist byline (now “NZ ACCOUNTING AND TAX SERVICES” / phone “NZ A&T SERVICES”)
+  Home statement “I am a Xero Specialist” (removed). First line is now “Providing flexible accounting and tax support to New Zealand accounting practices.”
+  Home statement “I assist firms” (now “We assist firms”)
+  Services intro “I provide flexible…” (now “We provide flexible…”)
+  Contact Me “I’d be glad to discuss how I can help” / “I respond promptly” (now we’d / we / We)
+  Form label “Your Requirements / Query” (now “Brief Requirements”)
+
+--------------------------------------------------------------------------------
+5. HOME — CURRENT STRUCTURE AND COPY  (/home/)
+--------------------------------------------------------------------------------
+File: src/app/home/page.tsx
+
+Hero — one paper panel over the photo (do not split into two boxes). Desktop: title left, statement right, hairline between. Mobile: same panel, stacked, hairline between. Tops align. Buttons stay under the byline.
+  Background (this section only, not Our Key Services): public/home-hero-meeting.png — professionals at a conference table. Decorative (empty alt). Copy sits on the single paper panel so the photo does not sit under the letters.
+
+  Left (inside the one panel):
+    H1: NZ ACCOUNTING AND TAX SERVICES
+      Two even lines: “NZ ACCOUNTING AND” then “TAX SERVICES”. All caps. “AND”, not “&”.
+      Header beside the logo is “NZ ACCOUNTING AND TAX SERVICES” (phone: “NZ A&T SERVICES”). Footer still uses the name Neeraj Dhankhar.
+    Line under the name (uppercase, tracked, brass dots):
+      Reliability · Accuracy · Flexibility
+      (was “Reliable • Accurate • Flexible”; user asked for something more professional)
+    Buttons sit close under that line (mt-8), not at the bottom of the hero:
+      VIEW SERVICES → /services/
+      CONTACT ME    → /contact-us/
+    Button treatment: on phones both are full width, min-height 3rem. From sm up they are an equal pair, min 12rem × 3.25rem, text 0.78rem. VIEW SERVICES is ink fill. CONTACT ME is ink outline, brass border + ink fill on hover.
+
+  Right (same panel, not a second box): brass bar beside the copy, short brass rule between the two paragraphs. First paragraph serif ink; second muted sans. Do not put “I am a Xero Specialist” back.
+    Providing flexible accounting and tax support to New Zealand accounting practices.
+
+    Working primarily in Xero on a fixed-fee basis, We assist firms through busy periods or on an ongoing basis to complete annual financial statements and tax returns efficiently.
+
+Services section (HOME only — not on About):
+  Small eyebrow: SERVICES
+  Heading: Our Key Services
+  Layout: two-column card grid, no numbers
+  List (exact):
+    - Annual Financial Statements and working papers
+    - Tax Return Preparation
+    - GST Returns and Compliance
+    - Xero Training
+    - Accounting & Tax Contractor Support
+    - Many more...
+
+Closing band (HOME):
+  Ready to connect?
+  If your practice needs accounting and tax support, through a busy period or on an ongoing basis, get in touch.
+  Button: CONTACT ME → /contact-us/ (full width on phones, auto width from sm up)
+
+--------------------------------------------------------------------------------
+6. ABOUT — CURRENT COPY  (/about/)
+--------------------------------------------------------------------------------
+File: src/app/about/page.tsx
+Use this copy. Do not add extra biography or CTAs the user did not include.
+
+Layout (refined so headings do not look raw):
+  Desktop: left column is label BACKGROUND + “Professional Profile” + short brass rule + compact credentials (CA ANZ membership | 10+ Years of experience) close under the heading, then body. Right column is a matted 3:4 portrait frame (paper border) with public/ProNeerajPhoto.jpeg and caption “Neeraj Dhankhar” with “XERO SPECIALIST” close under it (smaller, brass-deep, tracked). Frame is sticky.
+  Mobile: title block + credentials, then the frame, then the body.
+  Below: cream band with label WHAT TO EXPECT + “My Approach” + brass rule on the left, approach paragraph on the right.
+
+H1: Professional Profile
+  Do not put “About Me” or the PROFILE eyebrow back.
+
+Credentials (close under Professional Profile):
+  Provisional Member of Chartered Accountants Australia and New Zealand (CA ANZ)
+  10+ Years of experience
+  “Owner” is no longer shown in the credentials strip. Managing Owner is in the first body paragraph. The CA ANZ line sits left of the divider (two neat lines); “(CA ANZ)” is slightly smaller and muted, baseline-aligned with “Australia and New Zealand”. 10+ sits right, vertically centered on the full-height divider. The HTML is already 10+. The count 1 → 10 is CSS only (globals.css .about-years-*), so it works on localhost, on the private-IP:3000 phone URL, and with JavaScript off. Do not put the React/IntersectionObserver count-up back — that froze at 1 on the LAN IP because the client script did not run. Reduced motion shows 10+ at once. Do not put the “I am also a …” sentence back. Component: src/components/AboutHighlights.tsx (server component, no “use client”).
+
+No ink-medium emphasis in the current body. Do not invent highlighted phrases.
+
+Paragraphs (exact):
+  Neeraj Dhankhar is the Managing Owner of the business, with over ten years of experience in New Zealand accounting and tax services.
+
+  Neeraj moved to New Zealand with his family in 2015 and completed a Graduate Diploma in Accounting from MIT, Auckland. He gained practical experience with New Zealand Chartered Accounting practices in Cambridge and Hamilton, developing strong knowledge of NZ accounting, taxation, and compliance requirements. He is also a Provisional Member of Chartered Accountants Australia and New Zealand (CA ANZ).
+
+  He has extensive experience preparing annual financial statements, tax returns, GST returns, working papers, and year-end compliance, with strong expertise in Xero.
+
+  Since relocating to India in 2023, Neeraj has continued to provide remote accounting and tax support to New Zealand Chartered Accountants and accounting firms. With practical NZ accounting experience, he understands the requirements of working remotely and aims to provide simple, efficient, and reliable contractor support.
+
+H2: My Approach
+  Providing New Zealand accounting firms with reliable, accurate, and flexible contractor support. This enables your practice to scale workload capacity smoothly while fully maintaining your existing systems, standards, and processes.
+
+Do not put back the old first-person About body (“I hold a Graduate Diploma…”, “Currently operating from India, Providing…”, “Currently operating in India…”, “Currently temporarily operating out of New Zealand…”, or the “Once provided with access…” paragraph).
+
+Facts now on the record:
+  Managing Owner; over ten years NZ accounting and tax; moved to NZ with family in 2015; Grad Dip Accounting, MIT Auckland; work with CA practices in Cambridge and Hamilton; Provisional Member of CA ANZ; Xero; relocated to India in 2023; remote support for NZ CAs and firms. B.Com is in the footer, not in this About body.
+  Footer contact: +640223176728 (WhatsApp only); +918826966728 (Call and WhatsApp); neeraj@nzaccountingandtax.org (Email).
+  Title line: NZ Accounting & Tax Services Contractor.
+  Footer credentials line (exact): B.Com | Provisional Member – CA ANZ | Xero Specialist
+
+Our Key Services is NOT on About. It belongs on Home, under the SERVICES label.
+
+The old About “we provide professional and flexible…” copy, and the “Get in touch to discuss how we can support your practice” link, are no longer on this page.
+
+Photo:
+  public/ProNeerajPhoto.jpeg (also present at the project root). Used in the About frame via next/image. Caption is “Neeraj Dhankhar” with “XERO SPECIALIST” close below (smaller than the name). Do not replace with a different portrait unless the user supplies one.
+
+--------------------------------------------------------------------------------
+7. SERVICES — CURRENT COPY  (/services/)
+--------------------------------------------------------------------------------
+File: src/app/services/page.tsx
+Use this copy exactly. Do not add extra service blurbs, numbers, or CTAs the user did not include.
+
+Layout:
+  Eyebrow SERVICES + H1 “Key Services” + brass rule + intro paragraph (own band).
+  Four groups as full-width rows, not boxed cards. Desktop: title + brass rule on the left (19rem), list on the right with a vertical line and brass dots, items separated by hairlines. Alternate rows use a light cream band. Mobile: title, then the list. Intro sits beside a short brass bar in ink. No numbers.
+  Ampersands in these headings use a plain sans “&”, not the Playfair mark used in A&T. Do not use the decorative Playfair “&” in content bodies.
+
+H1: Key Services
+Intro:
+  We provide flexible accounting and tax support to New Zealand practices, assisting with client work from raw accounting records through to completed annual accounts and tax compliance.
+
+Financial Statements & Annual Accounts
+  - Preparation of annual financial statements and year-end accounts
+  - Compilation of detailed Xero working papers
+  - Review, reconciliation, and cleanup of accounting records
+  - Preparation of year-end balance sheet adjustments and supporting schedules
+
+Tax Returns & Compliance
+  - Preparation of New Zealand income tax returns across entity types
+  - Completion of IR10 financial statements and IR4J imputation returns
+  - Preparation of residential and commercial rental property schedules
+  - Verification of IRD client tax summaries and ACC data matching
+  - Organization of clear, audit-ready tax working papers and documentation
+
+Xero & Accounting Support
+  - Dedicated Xero setup, including tailored Chart of Accounts and tracking categories
+  - Comprehensive bank, credit card, and general ledger reconciliations
+  - Transaction coding, categorization, and ledger reviews
+  - General Xero maintenance and troubleshooting to keep client files current
+
+Trust & Entity Administration
+  - Preparation of annual trust minutes and trustee resolutions
+  - Support with documentation for annual trust compliance requirements
+  - Entity maintenance and record-keeping support
+
+Spelling on this page: “Organization” and “cleanup” are as supplied.
+
+The Home “Our Key Services” six-item teaser is unchanged except the heading (was “My”, now “Our” again). This page is the full list.
+
+7b. CONTACT US — CURRENT COPY  (/contact-us/)
+--------------------------------------------------------------------------------
+File: src/app/contact-us/page.tsx
+Form: src/components/EnquiryForm.tsx
+API: POST /api/contact/ (src/app/api/contact/route.ts)
+Mail helper: src/lib/enquiry-mail.ts
+Country codes: src/lib/country-codes.ts
+Use this copy exactly. Do not add address, hours, or extra CTAs the user did not include. Phone and email are in the site footer (every page), not in the Contact Me body.
+
+Layout:
+  Header band: CONTACT + “Let's Work Together” + brass rule + intro (brass bar, first paragraph in ink, second muted).
+  Form sits below on a cream band, max-width 2xl. Visible boxed inputs (border + paper fill). Your Name and Firm sit side by side on desktop. Mobile stacks.
+  Your Name and Phone Number are optional. Accounting Firm Name, Email Address, and Brief Requirements are required and show a red *.
+
+H1: Let's Work Together
+  If your practice needs reliable, flexible accounting and tax support, we'd be glad to discuss how we can help.
+
+  Please complete the form below with a brief overview of your requirements. We respond promptly and look forward to discussing how we can work together.
+
+Form fields:
+  Your Name — optional, not required
+  Accounting Firm Name — required
+  Email Address — required
+  Phone Number — optional. Country-code select (name + +code) plus number input. Default selected: New Zealand (+64).
+  Brief Requirements — required (was “Your Requirements / Query”)
+  Button: SUBMIT ENQUIRY
+
+On submit the form POSTs to /api/contact/. Do not log the Brevo SMTP key. Do not put the key in this file or in git. postreqcli@gmail.com and Gmail app passwords are no longer used. Restart Next.js after any .env.local change so the vars load.
+
+  Transport: smtp-relay.brevo.com port 587 (STARTTLS; connection/greeting 15s, socket 20s)
+  Auth login: BREVO_SMTP_LOGIN=b95d2e001@smtp-brevo.com
+              Do not use the From mailbox as the SMTP username. Do not use smtp-relay.brevo.com as the login.
+  Auth pass:  BREVO_SMTP_KEY from .env.local (gitignored; never store the key here)
+  From: "A&T" <BREVO_SMTP_USER>  (neeraj@nzaccountingandtax.org)
+  To:   neeraj@nzaccountingandtax.org
+  Subject: ENQUIRY from {Accounting Firm Name}
+  Reply-To: the visitor’s email address
+  If send fails, the form shows: “Your enquiry could not be sent. Please try again.”
+  Failed sends log enquiry-mail-fail with SMTP code/status only, never the key.
+  After a successful send, the same enquiry is stored in data/enquiries.json so it also appears in the admin panel.
+  Verified 15 September 2026: form send succeeded; confirmation “Your enquiry has been submitted.”
+
+Email is sent as HTML plus a plain-text fallback. Labels are bold and 16px; the inputted values beside them stay 14px regular and are not restyled. Omit the NAME line if Your Name is empty. Label is now ACCOUNTING FIRM NAME (not ACCOUTING).
+
+  NAME - {name, only if entered}
+  ACCOUNTING FIRM NAME - {firm}
+  EMAIL ADDRESS - {email}
+  PHONE NUMBER - {country code and number combined, e.g. +640211234567; omit this line if phone is empty}
+
+  --
+
+  {Your Requirements / Query}
+
+Phone in the email is combined: country dial code + digits only. Example: +64 and 0211234567 → +640211234567. Omit the PHONE NUMBER line when the visitor leaves phone empty.
+
+On success the form is replaced by a confirmation panel:
+  “Your enquiry has been submitted.”
+  (same words; presented as a serif confirmation with a RECEIVED label and brass rule)
+
+/contact-me/ still redirects to /contact-us/.
+
+7c. HIDDEN ADMIN  (/adm/)
+--------------------------------------------------------------------------------
+Files: src/app/adm/page.tsx, AdminLogin.tsx, AdminHome.tsx, actions.ts, session.ts
+No link from header, footer, Home, About, Services, or Contact. Do not add one. Header/footer are hidden on this route. public/robots.txt disallows /adm/. Page metadata is noindex.
+
+Login page: professional Admin Login, single password field, SIGN IN, small FORGET PASSWORD button. The UI must never mention MD5 or encoding.
+
+Login succeeds only if the visitor types this value (the MD5 form). Compare on the server only. Do not put the plaintext in client code.
+
+  Plaintext (for the owners; not used at the login box):
+    VanyaSePaglLadkiIsPuriDuniyaMeKoiNhiHai6568
+  Login value:
+    5095fbbd658e0cf115c0935562225794
+
+On success: signed-in admin panel (not a public page). Cookie is httpOnly, SameSite=strict, path /adm, 24 hours. The cookie holds a random token; only a hash is stored in data/sessions.json. SIGN OUT is on the panel. A previous static cookie is no longer valid — sign in again after this change.
+
+FORGET PASSWORD emails via Brevo (same SMTP as the contact form; From “A&T”) to:
+  neeraj@nzaccountingandtax.org
+  neerajsdrdnz@gmail.com
+  ryanbusiness6568@gmail.com
+Subject: ADMIN PASSWORD RECOVERY FOR A&T
+Body: the login value above (the MD5 form). Do not say MD5 in the email.
+
+After sign-in the panel has these functions (small, professional text). Do not put back the removed eyebrows: “Administration”, “Sender”, “Recipients”, “Visitors”, or the old “Who has visited” / site-status section.
+
+  Header
+     Logo + “Admin panel”. No “Administration” label.
+     SHUT DOWN WEBSITE (or MAKE WEBSITE ONLINE) and SIGN OUT. They stack full width on phones; from sm up they sit side by side on the right.
+     There is no separate Site status section.
+
+  1. VISITORS
+     Heading is VISITORS (not “Who has visited”). No “Visitors” eyebrow above it.
+     Every public visit is recorded (not /adm/, not Next internals, not icons).
+     Table columns: public IP, country name with flag, timestamp (en-NZ), browser, operating system, device type, referrer URL.
+     Country comes from ip-api.com. Local/private IPs show as Local with no flag.
+     Stored in data/visitors.json (newest first, cap 500). Gitignored.
+     CLEAR LOGS opens 1 day / 1 week / 1 month / All time. Each option deletes visitor rows from that period (all time empties the log).
+     The table sits in a fixed-height box (max 28rem / 60dvh) with its own scrollbar so the log does not lengthen the admin page. Header row stays visible while scrolling. Horizontal scroll remains for the wide table on phones.
+     The table updates on its own about every 2 seconds. Do not make the admin refresh to see a new visit.
+
+  2. Shut down
+     Header button only. When shut down, public pages show the A&T logo, the name, and the exact heading:
+       WEBSITE IS UNDER CONSTRUCTION
+     Header/nav is hidden. The usual footer still shows. /adm/ stays reachable so the admin can bring the site back. /privacy/ and /terms/ stay reachable while the site is shut down.
+
+  3. Enquiry delivery
+     Collapsed until the admin presses OPEN. No “Recipients” eyebrow.
+     Closed row shows the first address, or a count if there are more.
+     Admin can add more emails that each enquiry is sent to.
+     Default list: neeraj@nzaccountingandtax.org
+     The last remaining address cannot be removed.
+     Do not put the Email sender / Gmail app-password panel back. Enquiry mail and FORGET PASSWORD send through Brevo SMTP (BREVO_SMTP_LOGIN / BREVO_SMTP_KEY). From stays A&T <BREVO_SMTP_USER>.
+
+  4. Form submissions
+     Enquiries from Contact Me are listed on the panel (name if given, firm, email, phone, requirements, time).
+     Same records as the emailed ENQUIRY. Stored in data/enquiries.json (newest first, cap 500). Gitignored.
+     CLEAR opens 1 day / 1 week / 1 month / All time, same as visitor logs.
+     The list updates on its own about every 2 seconds. Do not make the admin refresh to see a new enquiry.
+
+Runtime store (do not commit JSON, .secret, or tmp files; passwords live here if the admin saved a sender):
+  data/config.json      offline flag, sender email, encrypted sender app password, enquiry recipients
+  data/visitors.json    visitor log
+  data/enquiries.json   form submissions
+  data/sessions.json    hashed admin session tokens
+  data/security.json    security events (failed login, recovery, limits) — no passwords
+  data/.secret          local app secret if ADMIN_SECRET is not set (gitignored)
+  data/.gitkeep         keeps the folder in git
+
+Do not add /adm/ to the public nav. Do not mention MD5 on the admin UI.
+
+7d. SECURITY AND LEGAL (13 September 2026)
+--------------------------------------------------------------------------------
+User asked to harden the whole site against OWASP Top 10:2025 and common issues, and to meet ordinary legal notices for a NZ site that collects enquiries and visit logs.
+
+What was patched (keep these; do not weaken them):
+  A01 Broken access control / SSRF
+    Admin actions still require a valid session. Country lookup only runs after the value is confirmed to be a public IP. Private, loopback, link-local, and metadata ranges are not fetched. Only a well-formed IP is copied into x-visitor-ip.
+  A02 Security misconfiguration
+    next.config.ts sets nosniff, DENY framing, Referrer-Policy, Permissions-Policy, COOP, CORP, CSP, HSTS, and poweredByHeader: false. /adm/ is no-store and X-Robots-Tag noindex. robots.ts Disallow /adm/. Open Graph image is CORP cross-origin.
+  A03 / A08 Supply chain and integrity
+    No new npm packages were added. Config, visitors, enquiries, and sessions are schema-checked on read. JSON is written via a temp file then replaced. Recipients must be valid emails (max 20).
+  A04 Cryptographic failures
+    Admin session is a random 24-hour token (hash stored server-side). Sender app password is encrypted at rest (AES-256-GCM). The login value the owners type is unchanged.
+  A05 Injection
+    Enquiry and admin fields are length-limited. Email headers strip CR/LF. HTML mail still escapes values. Hidden honeypot field on Contact Me (name=website) is not shown; if filled the form reports success and does not send mail.
+  A06 Insecure design
+    Same-origin check on public/admin writes. Rate limits: login 5 / 15 min per IP; password recovery 2 / hour per IP; enquiry 5 / hour per IP. Visit log skips repeats within 15 seconds for the same IP and path.
+  A07 Authentication failures
+    Timing-safe compare kept. Failed logins and lockouts are recorded in data/security.json without the typed password.
+  A09 Logging
+    Security events are stored (no secrets). Enquiry mail must not log BREVO_SMTP_KEY. Failed sends log enquiry-mail-fail with SMTP code/status only.
+  A10 Exceptional conditions
+    src/app/error.tsx, global-error.tsx, not-found.tsx show a short generic message only.
+
+Legal pages (normal text, averagely neat, full rights coverage):
+  /privacy/  Privacy Act 2020 rights (access, correction, complain to OPC), Contact Me fields, optional name/phone, no selling, holding/deleting, email contact. Normal 16px text. Simple h1/h2. No brass bar, no giant type, no all-lowercase dump.
+  /terms/    acceptance, not advice, enquiry is not an engagement, do not send secrets, acceptable use, IP, availability, no warranty, liability / CGA in trade, privacy cross-link, changes, NZ law. Same layout.
+  Footer links only. Do not add Privacy or Terms to the header nav.
+  Do not mention the admin panel, /adm/, visit logs, IP, country, browser, cookies, Gmail, SMTP, sender mailbox, geolocation, session, or shutting the site down. Those pages must not leak how the site is run.
+
+Optional env: ADMIN_SECRET (strong random string) for encryption and app secret. If missing, data/.secret is created. Never commit it.
+
+7e. PRIVACY / TERMS COPY
+--------------------------------------------------------------------------------
+Use the pages as written in src/app/privacy/page.tsx and src/app/terms/page.tsx. Normal readable text that covers the legal rights. Averagely neat only — simple headings, normal size. Do not use giant type. Do not put back the designed brass-bar legal layout, “Legal”, or “Last updated”. Do not put back admin / visitor / mail-server wording.
+
+7f. SEO (14 September 2026)
+--------------------------------------------------------------------------------
+User asked to optimise so the site can rank. Do not invent blogs, reviews, extra services, or keyword stuffing. Titles and descriptions only reuse copy already on the site (name, Xero Specialist, support line, About/Services/Contact sentences). Visible page copy and layout stay as in sections 4–7 unless the user changes them.
+
+What is in the code:
+  html lang=en-NZ
+  Unique title + meta description + canonical on /home/, /about/, /services/, /contact-us/, /privacy/, /terms/
+  Home title is absolute: Neeraj Dhankhar · Xero Specialist | Accounting & Tax Support for New Zealand Accounting Firms
+  Open Graph + Twitter summary_large_image
+  src/app/opengraph-image.tsx (1200×630, A&T + brand + Xero Specialist + support line + name)
+  JSON-LD ProfessionalService + Person + WebSite on public pages only (not /adm/). Uses footer phones/email and existing About/Home facts. Do not add a street address.
+  src/app/sitemap.ts lists /home/, /about/, /services/, /contact-us/, /privacy/, /terms/ only
+  src/app/robots.ts Allow / ; Disallow /adm/ ; Sitemap https://nzaccountingandtax.org/sitemap.xml
+  public/robots.txt was removed so the App Router robots file is the source
+  / and /contact-me/ use permanentRedirect (308)
+  /adm/ remains noindex (metadata + X-Robots-Tag). 404 is noindex.
+  When the admin shuts the site down, generateMetadata sets noindex
+  Open Graph image is CORP cross-origin so social crawlers can fetch it
+  Visit log skips /robots.txt, /sitemap.xml, /opengraph-image
+
+Helpers: src/lib/seo.ts (pageUrl, pageMetadata), src/components/JsonLd.tsx
+
+Ranking still needs the live domain, Google Search Console, and time. Do not promise page-one placement. Do not add fake content to chase keywords.
+
+--------------------------------------------------------------------------------
+8. CONTENT STILL NEEDED FROM THE CLIENT
+--------------------------------------------------------------------------------
+- Photo / headshot — done: public/ProNeerajPhoto.jpeg on About
+- Office address, hours (phone and email are now in the footer)
+- Gmail SMTP removed. Brevo SMTP is working (login b95d2e001@smtp-brevo.com). No further mail credentials needed unless the key is rotated. Do not store the SMTP key in this file.
+- Full Services page is done (see section 7). Do not add more service items unless the user supplies them.
+- Fees, if any
+- Whether to show nzaccountingandtax.org in the header or footer
+- Whether to keep or change the Home “Ready to connect?” band further
+
+--------------------------------------------------------------------------------
+9. WORK LOG (12 September 2026)
+--------------------------------------------------------------------------------
+- Empty folder. Site is for Neeraj Dhankhar so clients can see who he is, his services, and contact. information.txt created as the handoff file.
+- Scaffolded Next.js + TS + Tailwind. trailingSlash on. / redirects to /home/.
+- Built shared header/footer and Home first. Other routes started as stubs so nav never 404s.
+- Mobile menu: unmounting the drawer on click cancelled navigation. Menu now stays mounted and closes on route change.
+- Removed “Chartered Accountant · New Zealand” from hero and footer.
+- Header byline set to “Xero Specialist | Accounting & Tax Support for New Zealand Accounting Firms”. Highlight Xero Specialist. Byline sits close under the name.
+- Logo mark ND → A&T. Same mark is the browser tab icon, using Playfair so the custom “&” matches.
+- About built from client copy. First pass wrongly put Our Key Services on About.
+- Correction: Our Key Services belongs on HOME, not About.
+- Hero line: “Reliable • Accurate • Flexible” then refined to “Reliability · Accuracy · Flexibility”.
+- Removed: The practice, A brief introduction (label), How I can help, copyright footer line.
+- Intro text was rewritten several times, then placed beside the name (two-column hero).
+- Services block restyled. Label became SERVICES. Numbers removed. Sixth item “Many more...” added.
+- CONTACT US → CONTACT ME. /contact-us/ → /contact-me/. Old path redirects.
+- Website name / domain: nzaccountingandtax.org. Stored in site.ts and metadataBase.
+- Footer text: “Accounting and Tax Services”.
+- Home intro set to the user-supplied first-person copy (see section 5). Use that wording exactly. Later replaced by the two-paragraph “flexible… practices” / “Working primarily in Xero…” copy.
+- Closing band heading: “Ready to connect?”. Body rewritten to match firm-support positioning: “If your practice needs accounting and tax support, through a busy period or on an ongoing basis, get in touch.” (replaced the old accounts / new venture line).
+- About rebuilt with full client “About Me” / “My Approach” copy. Empty professional portrait frame on the right (photo to be supplied). Old short About copy and Get in touch line removed from About. “temporily” corrected to “temporarily”.
+- About layout polished: PROFILE / WHAT TO EXPECT eyebrows, brass rules under headings, lead paragraph in ink, matted photo frame with name caption, My Approach as a two-column band. Copy unchanged.
+- About eyebrows: “About” → “PROFILE”; “Approach” → “WHAT TO EXPECT”.
+- About lead sentence removed. Replaced with two credentials: “Owner” and animated “10+ Years of experience” (eases 1 → 10 in ~2.2s, then 10+). Type is smaller and sits close under About Me.
+- About phrases made prominent with ink + medium weight (no marker highlight): Grad Dip MIT Auckland; preparing annual financial statements… New Zealand clients; Working across time zones.
+- CA ANZ sentence removed from the bio. “Owner” was replaced by “Provisional Member of Chartered Accountants Australia and New Zealand (CA ANZ)” in the credential row beside 10+.
+- Services page built from the supplied Key Services copy. Four groups: Financial Statements & Annual Accounts; Tax Returns & Compliance; Xero & Accounting Support; Trust & Entity Administration. No extra CTAs or invented items.
+- Content headings must not use the Playfair “&”. The decorative ampersand stays on the A&T mark only. Service titles use a plain sans “&”.
+- Services layout refined: boxed cards removed. Each group is a title-left / list-right row (About Approach pattern), alternating cream bands.
+- Services a little more styled: intro in ink with a brass bar; list items use brass dots and hairline dividers, vertical rule beside the list on desktop.
+- Home heading: “Our Key Services” → “My Key Services”.
+- Contact Me built: “Let's Work Together” copy plus POST enquiry form (firm, email, country-code phone, requirements). Success text: “Your enquiry has been submitted.” Phone received as “[code] + [number]”. No public phone/email listed.
+- Contact form: all original fields stay required. Added optional “Your Name”.
+- Contact layout refined: intro band like Services; form on a cream band; Name and Firm in one row on desktop.
+- Contact inputs are visible boxes again. Required fields show a red *.
+- Footer now carries the supplied identity and contact lines on every page (name, contractor line, B.Com | CA ANZ | Xero Specialist, two phones, email).
+- Footer contacts aligned in a 3-column grid: value | optional Call | WhatsApp or Email. +640223176728 has WhatsApp only; +918826966728 has Call and WhatsApp; email has Email. Icons sit in a fixed 14px box so they line up. Buttons are equal width (7.25rem).
+- About 10+ count-up slowed from ~1.3s to ~2.2s (DURATION_MS = 2200 in AboutHighlights.tsx).
+- Footer credentials spelling: “CAANZ” → “CA ANZ”. Exact line is now “B.Com | Provisional Member – CA ANZ | Xero Specialist”.
+- Footer bottom line (very small, below everything): “Accounting and Tax Services”.
+- Footer buttons are icon-only (no WhatsApp / Call / Email text), 28px squares, aligned beside the matching number or email.
+- Home hero intro replaced. Exact copy is now two paragraphs (see section 5): “I am a Xero Specialist providing flexible accounting and tax support to New Zealand accounting practices.” then “Working primarily in Xero on a fixed-fee basis, I assist firms through busy periods or on an ongoing basis to complete annual financial statements and tax returns efficiently.” First paragraph in ink, second muted. Do not put the old three-paragraph intro back.
+- Footer alignment: identity stays left; phones/email/icons sit on the right edge of the footer content (justify-between). Do not leave the contact block sitting mid-footer.
+- Home intro restyled (copy unchanged): brass rule + vertical brass bar; first paragraph serif ink with “Xero Specialist” in brass-deep; second paragraph muted. Do not leave it as raw body text.
+- Home intro restyled again: matted paper frame + cream panel + brass edge/hairline. First sentence breaks visually after “Xero Specialist”. Copy still exact.
+- Home hero columns: same height, tops and bottoms flush. Name/byline at top left, buttons at bottom left, matching the statement card.
+- Home hero buttons sit close under Reliability · Accuracy · Flexibility (no stretch gap). Equal size (min 12rem × 3.25rem), slightly larger type. Primary is ink; outline picks up brass on hover.
+
+WORK LOG (13 September 2026)
+- Home intro copy replaced with the two-paragraph “flexible… practices” / “Working primarily in Xero…” text. Old three-paragraph intro removed (see Removed list).
+- Home intro restyled as a matted statement card (paper frame, cream panel, brass). Copy unchanged.
+- Home hero left/right tops align. Buttons stay close under the byline — do not use justify-between to match card height.
+- Hero buttons enlarged and equalised (12rem × 3.25rem).
+- About 10+ count-up is ~2.2s.
+- Footer: CA ANZ (space); icon-only WhatsApp / Call / Email; identity left, contacts right; small “Accounting and Tax Services” under everything.
+- information.txt refreshed so current copy and layout above are the source of truth. Later work-log lines in 12 September that mention labelled 7.25rem footer buttons or a stretched hero are superseded by this file’s current sections.
+- About portrait: empty frame replaced with public/ProNeerajPhoto.jpeg.
+- Enquiry email subject is now “ENQUIRY from {Accounting Firm Name}”. Body labels are HTML bold/larger; values stay as typed. Label spelling is ACCOUNTING FIRM NAME.
+- Contact Me form now emails from postreqcli@gmail.com to neeraj@nzaccountingandtax.org via Gmail SMTP (nodemailer). Subject is “ENQUIRY from {firm}”. Labels (NAME if present, ACCOUNTING FIRM NAME, EMAIL ADDRESS, PHONE NUMBER) are bold and larger in HTML; inputted values are unchanged. NAME line omitted if empty. Phone is country code + digits combined. GMAIL_PASS is in .env.local.
+- Hidden /adm/ admin login added. No public link. Login accepts only 5095fbbd658e0cf115c0935562225794. FORGET PASSWORD emails that value from the configured sender to Neeraj (both addresses) and ryanbusiness6568@gmail.com with subject ADMIN PASSWORD RECOVERY FOR A&T. UI must not mention MD5.
+- Admin panel after sign-in: visitor log (IP, country + flag, time, browser, OS, device, referrer); shut down / make online (public site shows WEBSITE IS UNDER CONSTRUCTION with logo + footer); change sender email + app password; add enquiry recipient emails; view Contact Me enquiries on the panel. Data lives in data/*.json (gitignored).
+- Admin panel tidy: removed Administration / Sender / Recipients / Visitors eyebrows and the Site status block. SHUT DOWN WEBSITE sits in the header beside SIGN OUT. Visitors heading is VISITORS. Email sender and Enquiry delivery stay collapsed until OPEN. CLEAR LOGS can wipe 1 day / 1 week / 1 month / all time.
+- Form submissions has a CLEAR button (same 1 day / 1 week / 1 month / all time). VISITORS and Form submissions refresh themselves about every 2 seconds so new visits and enquiries appear without reloading /adm/.
+- Site made phone-compatible (Android and iOS): device viewport, no sideways scroll, 44px tap targets on small screens, 16px inputs, full-width home/contact/admin actions, hamburger body-scroll lock, wrapping construction heading, safe-area padding. Copy unchanged. Checked on 320 / 360 / 390 widths: Home, About, Services, Contact Me form, footer WhatsApp/Call/Email, admin (OPEN, CLEAR, live visitors), construction + footer, /adm/ still reachable while offline. Site left online.
+- information.txt refreshed again so the current sections (not older work-log lines) are the source of truth.
+- Home heading “My Key Services” → “Our Key Services”.
+- Home statement: removed “I am a Xero Specialist”. First line is “Providing flexible accounting and tax support to New Zealand accounting practices.” Second line uses “We assist”. Box padding and brass bar aligned.
+- Home H1 is now “NZ Accounting and Tax Services” (two lines: NZ Accounting and / Tax Services).
+- Header beside the logo is “NZ ACCOUNTING AND TAX SERVICES” on desktop and “NZ A&T SERVICES” on phones. Old name + byline removed from the header lockup.
+- iOS hamburger: removed the HTML hidden attribute (it kept the menu closed on iPhone). Menu uses CSS only and a nav-open body lock.
+- About portrait caption: “XERO SPECIALIST” sits close under “Neeraj Dhankhar”, smaller and brass-deep.
+- Home hero (below header, above Our Key Services): background photo of professionals at a table (public/home-hero-meeting.png) with a paper wash so the existing copy stays readable.
+- Home H1 is now “NZ ACCOUNTING AND TAX SERVICES” (two lines, all caps). Left hero copy sits on a solid paper panel so the photo does not wash through the type.
+- Privacy Policy and Terms of Use: removed the “Legal” eyebrow and “Last updated: 13 September 2026”.
+- iOS menu again: hamburger is now a native details/summary; the list is fixed under the header. Removed the body position:fixed lock that stopped the menu showing on iPhone.
+- iOS menu: list is outside the sticky header; overflow-x clip moved from html/body onto main so the panel is not clipped on iPhone.
+- Home hero: the two separate boxes are now one paper panel (title + statement). Copy unchanged.
+- Header byline under the lockup title: “Accounting & Tax Support for New Zealand Accounting Firms” (desktop and phone).
+- Services intro: “I provide…” → “We provide…”. Rest of the sentence unchanged.
+- Contact Me intro is now we’d / we / We. Phone Number is optional. Form label “Your Requirements / Query” → “Brief Requirements”.
+- Security hardening (OWASP Top 10:2025): random 24h admin sessions, encrypted sender password, rate limits, origin checks, field/header sanitising, IP-only country lookup, security headers/CSP, generic error pages, security event log. Login value unchanged.
+- Legal: /privacy/ and /terms/ added. Footer links. Those two routes stay available if the site is shut down. Header nav unchanged. Empty phone is omitted from the enquiry email.
+- iOS hamburger: native checkbox + label, list in normal flow under the bar. Removed position:fixed, React onClick, and html.nav-open overflow lock — those kept the Home menu from showing on iPhone.
+- Privacy Policy and Terms of Use stripped of admin / visitor / Gmail / cookie internals. Pages are now short grey fine print so they are not worth reading. No designed legal layout.
+- Privacy / Terms type made huge so the same short copy fills the page and people skip it.
+- Privacy / Terms rewritten: normal 16px text, simple headings, full Privacy Act / terms coverage. Not giant type. Not the designed brass layout. Still no admin / visitor / mail internals.
+- iPhone menu: removed the checkbox control (Safari drew a native tick). Hamburger is a three-line button again. List still opens in normal flow under the header.
+- iPhone hamburger: React button still did not tap. Restored native label→hidden checkbox (clipped, not overlaid) so the three-line box opens the in-flow list without JS. Do not put a React onClick button back.
+- Footer ContactRow fragment changed to display:contents to stop a hydration mismatch that could remount the header on iPhone.
+- iPhone hamburger: removed the checkbox (phone drew a blank circle). Now native details/summary, three-line box, list in flow. Do not put a checkbox or React button back.
+- Phone menu icon: hide Safari’s details arrow. Use a three-line SVG hamburger (X when open).
+- Phone hamburger again: dropped details (Safari arrow, icon off-screen). Grid pins a 44px three-bar box on the right. Checkbox is display:none; the label is the hamburger.
+- Real iPhone/Android still showed a native checkbox. Removed the input. Hamburger is now a #show-menu link; :target opens the list. No checkbox in the DOM.
+- Hash menu left the phone header stacked and the list stuck open. Replaced with a simple flex bar: logo left, 44px three-line button right, list hidden until tap.
+- Phone header kept as the tap button (no ?menu=1). Row is inline-styled so the logo stays beside the title. Menu still opens from the three-line button.
+- Phone menu was not opening. Button now handles click, pointerup, and touchend. List also opens when the button is focused, so a phone tap still shows HOME / ABOUT / SERVICES / CONTACT ME.
+- Phone menu still did not open. The three-line box is now a link to #phone-menu. :target only shows the list. The header row does not change. No React toggle and no ?menu=1.
+- Hash open/close was sliding the page. Open/close now point at hidden 1px marks (#nav-open / #nav-closed) inside .phone-header, not the menu or the header. keepPageStill keeps scroll where it was. Real phone: menu opens, tap again closes, page does not slide. This is the current hamburger. Do not put checkbox, details, React button toggle, or ?menu=1 back.
+- Header nav is CONTACT US again → /contact-us/. /contact-me/ redirects to /contact-us/. Home hero and Ready to connect buttons still say CONTACT ME and now go to /contact-us/.
+- Header byline is XERO SPECIALIST (small, tracked, brass-deep). Old “Accounting & Tax Support for New Zealand Accounting Firms” is out of the header.
+- About 10+ years was frozen at 1. Count-up now starts if the block is already visible, and has a short fallback so it cannot stay on 1.
+- About 10+ must work on the private-IP:3000 phone URL and with JavaScript off. The figure is 10+ in the HTML. The 1→10 motion is CSS in globals.css. Do not use a client count-up. About eyebrow is BACKGROUND (not PROFILE). H1 is Professional Profile (not About Me). Location line is “Currently operating from India, Providing…”. Approach line starts “Providing New Zealand accounting firms…”.
+- About location line is “Currently operating from India…”, not “in India”.
+- About main body replaced (14 September 2026) with four third-person paragraphs: Managing Owner; moved to NZ in 2015 / Grad Dip MIT Auckland / Cambridge and Hamilton / CA ANZ; financial statements, tax, GST, working papers, Xero; relocated to India in 2023 and continues remote NZ support. No invented emphasis. Heading, credentials strip, photo, and My Approach band unchanged.
+- SEO: unique titles/descriptions/canonicals, OG image, JSON-LD, sitemap, robots.ts, 308 redirects, /adm/ noindex. No invented copy. Visible pages unchanged.
+- Hydration: SiteChrome uses the server pathname for the first paint, then the client pathname after mount, so the header class names match. html/body have suppressHydrationWarning. #nav-open / #nav-closed no longer use the HTML hidden attribute (1px CSS marks only).
+- Hydration (15 September 2026): overlay pointed at SiteFooter.tsx, then EnquiryForm.tsx. Footer was imported by the client SiteChrome (so it hydrated) and contact rows used display:contents. Footer is now a server slot from layout.tsx; contact rows are direct grid cells. The remaining mismatch was the country-code select: inline SVG style plus the browser restoring a previous value (e.g. India) over the server default New Zealand. Chevron is now in globals.css. The select, email, and phone inputs have suppressHydrationWarning. Copy and numbers unchanged.
+- Admin panel (15 September 2026): VISITORS log is in a fixed-height scroll box so it does not lengthen the page. Email sender panel removed. Do not put that Gmail sender form back. Enquiry delivery stays. Mail still goes through Brevo.
+- Contact form POSTs /api/contact/ via Nodemailer + Brevo SMTP. From display name A&T, to neeraj@nzaccountingandtax.org, replyTo visitor email, subject ENQUIRY from {firm}. Gmail postreqcli sender removed from sending. HTML email structure (bold 16px labels, 14px values) is unchanged.
+- Contact form first failed (15 September 2026) with Brevo 535 Authentication failed because the SMTP username was the From mailbox neeraj@nzaccountingandtax.org. Client supplied BREVO_SMTP_LOGIN=b95d2e001@smtp-brevo.com. SMTP verify succeeded. Live form submit succeeded and showed “Your enquiry has been submitted.” From stays A&T <BREVO_SMTP_USER>. Failures log enquiry-mail-fail without the key. Mailer uses 15s connection/greeting and 20s socket timeouts. Restart Next.js after changing .env.local.
+
+--------------------------------------------------------------------------------
+10. FILE MAP
+--------------------------------------------------------------------------------
+information.txt                          This memory file — keep current
+package.json                             Scripts and deps
+next.config.ts                           trailingSlash: true; security headers; OG image CORP cross-origin
+src/lib/site.ts                          name, domain, highlight, supportLine, A&T, nav items
+src/lib/security.ts                      Field limits, email/header checks, origin check, password encrypt
+src/lib/ip.ts                            IP format and public-IP checks (used by proxy + visit log)
+src/lib/rate-limit.ts                    In-memory limits for login, recovery, enquiry
+src/lib/app-secret.ts                    ADMIN_SECRET or data/.secret
+src/lib/security-log.ts                  data/security.json events
+src/app/privacy/page.tsx                 Privacy Policy
+src/app/terms/page.tsx                   Terms of Use
+src/app/error.tsx                        Generic page error
+src/app/global-error.tsx                 Generic root error
+src/app/not-found.tsx                    Generic missing page (noindex)
+src/lib/seo.ts                           Canonical URLs, page titles/descriptions, Open Graph helpers
+src/components/JsonLd.tsx                schema.org ProfessionalService + Person + WebSite
+src/app/robots.ts                        Allow / ; Disallow /adm/ ; sitemap URL
+src/app/sitemap.ts                       Public pages only
+src/app/opengraph-image.tsx              1200×630 share image
+src/lib/brand-icon.tsx                   Shared A&T PNG generator for tab icons
+src/app/layout.tsx                       Fonts, viewport, generateMetadata, JsonLd, SiteChrome, visit log, offline noindex
+src/app/globals.css                      Palette, phone header/menu :target, 16px inputs, safe-area padding, About 10+ CSS count
+src/proxy.ts                             Passes pathname and visitor IP into the request (Next.js 16 proxy)
+src/lib/site-data.ts                     JSON store: config, visitors, enquiries
+src/lib/visit-log.ts                     UA parse, country lookup, flag, recordVisit
+src/lib/mailer.ts                        Brevo SMTP (smtp-relay.brevo.com:587). Login b95d2e001@smtp-brevo.com; From BREVO_SMTP_USER; 15s/20s timeouts
+src/lib/enquiry-mail.ts                  Contact form validation, HTML mail, send + store
+src/components/SiteChrome.tsx            No chrome on /adm/; construction + footer when offline; footer is a server slot
+src/components/ConstructionScreen.tsx    Logo + exact WEBSITE IS UNDER CONSTRUCTION
+src/app/adm/page.tsx                     Hidden admin login / signed-in panel
+src/app/adm/AdminLogin.tsx               Password field + FORGET PASSWORD
+src/app/adm/AdminHome.tsx                Header buttons, live visitors, enquiry delivery, live enquiries
+src/app/adm/actions.ts                   Sign in/out, recover, toggle, recipients, clear, live loaders
+src/components/AdminDisclosure.tsx       OPEN / CLOSE panel for enquiry delivery
+src/components/AdminClearMenu.tsx        CLEAR / CLEAR LOGS menu: 1 day / 1 week / 1 month / all time
+src/components/AdminVisitorsPanel.tsx    Live visitor table in a scroll box
+src/components/AdminEnquiriesPanel.tsx   Live form submissions + CLEAR
+src/components/useAdminLive.ts           2s poll for admin lists
+src/lib/admin-display.ts                 Flag + en-NZ timestamp for admin tables
+src/app/adm/session.ts                   Cookie session; login value compared here
+data/.gitkeep                            Keeps data/ in git; JSON files are gitignored
+src/app/page.tsx                         308 to /home/
+src/app/home/page.tsx                    Home (hero statement card + key services + ready band)
+public/home-hero-meeting.png             Home hero background: professionals at a table
+src/app/about/page.tsx                   About (client copy + ProNeerajPhoto.jpeg)
+public/ProNeerajPhoto.jpeg               About portrait
+src/components/AboutHighlights.tsx       About credentials: CA ANZ + 10+ (HTML 10+; CSS count, no JS)
+src/app/services/page.tsx                Services (client copy only)
+src/app/contact-us/page.tsx              Contact Us (copy + form)
+src/app/api/contact/route.ts             Enquiry POST — Brevo SMTP, stores enquiry
+.env.local                               BREVO_SMTP_USER / BREVO_SMTP_LOGIN / BREVO_SMTP_KEY (gitignored; key not in repo)
+src/components/EnquiryForm.tsx           Contact form + confirmation; country select chevron in CSS; suppressHydrationWarning on select/email/phone
+src/lib/country-codes.ts                 Phone country calling codes
+src/app/contact-me/page.tsx              308 to /contact-us/; noindex
+src/app/icon.tsx                         64px tab favicon
+src/app/apple-icon.tsx                   180px Apple icon
+src/app/fonts/PlayfairDisplay-Regular.ttf
+src/app/fonts/OFL.txt
+src/components/SiteHeader.tsx            Desktop nav + phone #nav-open / #nav-closed hamburger
+src/components/LogoMark.tsx              A&T square
+src/components/SiteFooter.tsx            Name, CA ANZ line, icon-only WhatsApp/Call/Email as direct grid cells, small bottom line
+src/components/PlaceholderPage.tsx       Stub layout for unfinished pages
+
+--------------------------------------------------------------------------------
+11. HOW THE NEXT CHAT MUST CONTINUE
+--------------------------------------------------------------------------------
+1. Read this entire file first. Do not rebuild the stack.
+2. Follow the user’s words. Do not invent copy or extra sections.
+3. Home, About, Services, Contact Us, hidden /adm/, and phone layout are built. Use the current copy and rules in sections 4–7c, not older work-log wording. The public site is online unless an admin shuts it down. Header nav is CONTACT US → /contact-us/. /contact-me/ redirects there.
+4. Phone and email are in the footer on every page. Contact Us POSTs /api/contact/. Mail is Brevo SMTP and is working: From “A&T” <BREVO_SMTP_USER>, To neeraj@nzaccountingandtax.org, subject ENQUIRY from {firm}, SMTP login BREVO_SMTP_LOGIN=b95d2e001@smtp-brevo.com. Keys live in .env.local. Never commit that key or data/*.json. Do not put postreqcli@gmail.com back into sending. Restart the Next.js server after changing .env.local.
+5. After every change, update this file (current copy, file map, work log).
+6. Domain for later deploy / canonical URLs: nzaccountingandtax.org. After deploy, submit https://nzaccountingandtax.org/sitemap.xml in Google Search Console.
+7. Do not restore removed copy. Do not invent biography, fees, address, or extra services.
+8. Do not link to /adm/ from the public site. Do not mention MD5 on the admin screen.
+9. When the site is shut down, public pages show WEBSITE IS UNDER CONSTRUCTION with the logo and footer. /adm/, /privacy/, and /terms/ must stay reachable.
+10. Public and admin screens must stay usable on phones (Android and iOS). Do not break tap targets, the hamburger, the enquiry form, or footer Call / WhatsApp / Email links. The current hamburger is the #nav-open / #nav-closed link + :target list. Do not “fix” it with a checkbox, details, a React button, or ?menu=1.
+11. Keep the security controls in section 7d. Do not log passwords. Do not commit data/*.json, data/.secret, or .env.local.
