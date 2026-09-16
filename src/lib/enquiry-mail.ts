@@ -186,7 +186,7 @@ export async function processEnquiry(formData: FormData): Promise<EnquiryState> 
   try {
     await addEnquiry(enquiry);
   } catch {
-    /* Mail already sent. Vercel has no lasting disk for data/enquiries.json. */
+    /* Mail already sent. Live store is Vercel Blob; a store miss must not fail the form. */
   }
 
   return { ok: true };

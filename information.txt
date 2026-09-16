@@ -342,7 +342,7 @@ On submit the form POSTs to /api/contact/. Do not log the Brevo SMTP key. Do not
   Reply-To: the visitor’s email address
   If send fails, the form shows: “Your enquiry could not be sent. Please try again.”
   Failed sends log enquiry-mail-fail with SMTP code/status only, never the key.
-  After a successful send the form shows “Your enquiry has been submitted.” even if storing the copy in data/enquiries.json fails. On Vercel the disk is not lasting; mail still goes to neeraj@nzaccountingandtax.org. Locally the enquiry is also stored for the admin panel.
+  After a successful send the form shows “Your enquiry has been submitted.” even if storing the admin copy fails. Locally the copy is stored in data/enquiries.json. On Vercel it is stored in a private Blob (nzat-admin/enquiries.json) so Form submissions on /adm/ can list it.
   Verified 15 September 2026: form send succeeded; confirmation “Your enquiry has been submitted.”
 
 Email is sent as HTML plus a plain-text fallback. Labels are bold and 16px; the inputted values beside them stay 14px regular and are not restyled. Omit the NAME line if Your Name is empty. Label is now ACCOUNTING FIRM NAME (not ACCOUTING).
@@ -366,7 +366,7 @@ On success the form is replaced by a confirmation panel:
 
 7c. HIDDEN ADMIN  (/adm/)
 --------------------------------------------------------------------------------
-Files: src/app/adm/page.tsx, AdminLogin.tsx, AdminHome.tsx, actions.ts, session.ts, src/lib/admin-recover.ts, src/app/api/adm-recover/route.ts
+Files: src/app/adm/page.tsx, AdminLogin.tsx, AdminHome.tsx, actions.ts, session.ts, src/lib/admin-recover.ts, src/app/api/adm-recover/route.ts, src/lib/persistent-store.ts
 No link from header, footer, Home, About, Services, or Contact. Do not add one. Header/footer are hidden on this route. public/robots.txt disallows /adm/. Page metadata is noindex.
 
 Login page: professional Admin Login, single password field, SIGN IN, small FORGET PASSWORD button. The UI must never mention MD5 or encoding.
@@ -400,7 +400,7 @@ After sign-in the panel has these functions (small, professional text). Do not p
      Every public visit is recorded (not /adm/, not Next internals, not icons).
      Table columns: public IP, country name with flag, timestamp (en-NZ), browser, operating system, device type, referrer URL.
      Country comes from ip-api.com. Local/private IPs show as Local with no flag.
-     Stored in data/visitors.json (newest first, cap 500). Gitignored.
+     Stored newest first, cap 500. Locally: data/visitors.json (gitignored). On Vercel: private Blob nzat-admin/visitors.json — the live disk cannot keep JSON files.
      CLEAR LOGS opens 1 day / 1 week / 1 month / All time. Each option deletes visitor rows from that period (all time empties the log).
      The table sits in a fixed-height box (max 28rem / 60dvh) with its own scrollbar so the log does not lengthen the admin page. Header row stays visible while scrolling. Horizontal scroll remains for the wide table on phones.
      The table updates on its own about every 2 seconds. Do not make the admin refresh to see a new visit.
@@ -420,18 +420,21 @@ After sign-in the panel has these functions (small, professional text). Do not p
 
   4. Form submissions
      Enquiries from Contact Me are listed on the panel (name if given, firm, email, phone, requirements, time).
-     Same records as the emailed ENQUIRY. Stored in data/enquiries.json (newest first, cap 500). Gitignored.
+     Same records as the emailed ENQUIRY. Newest first, cap 500. Locally: data/enquiries.json. On Vercel: private Blob nzat-admin/enquiries.json.
      CLEAR opens 1 day / 1 week / 1 month / All time, same as visitor logs.
      The list updates on its own about every 2 seconds. Do not make the admin refresh to see a new enquiry.
 
 Runtime store (do not commit JSON, .secret, or tmp files; passwords live here if the admin saved a sender):
+  Locally:
   data/config.json      offline flag, sender email, encrypted sender app password, enquiry recipients
   data/visitors.json    visitor log
   data/enquiries.json   form submissions
-  data/sessions.json    unused on live (signed cookie session; file may still exist locally)
+  data/sessions.json    unused (signed cookie session; file may still exist locally)
   data/security.json    security events (failed login, recovery, limits) — no passwords
   data/.secret          local app secret if ADMIN_SECRET is not set (gitignored). On Vercel, signing uses ADMIN_SECRET (≥32 chars) or a stable hash of BREVO_SMTP_KEY.
   data/.gitkeep         keeps the folder in git
+  On Vercel:
+  Private Blob (linked to the neerajwebsite project). Paths nzat-admin/config.json, visitors.json, enquiries.json. Vercel sets BLOB_READ_WRITE_TOKEN / BLOB_STORE_ID. Do not put those tokens in this file or in git. Live visitors, enquiries, offline flag, and enquiry recipients will not persist without that Blob store.
 
 Do not add /adm/ to the public nav. Do not mention MD5 on the admin UI.
 
@@ -445,7 +448,7 @@ What was patched (keep these; do not weaken them):
   A02 Security misconfiguration
     next.config.ts sets nosniff, DENY framing, Referrer-Policy, Permissions-Policy, COOP, CORP, CSP, HSTS, and poweredByHeader: false. /adm/ is no-store and X-Robots-Tag noindex. robots.ts Disallow /adm/. Open Graph image is CORP cross-origin.
   A03 / A08 Supply chain and integrity
-    No new npm packages were added. Config, visitors, enquiries, and sessions are schema-checked on read. JSON is written via a temp file then replaced. Recipients must be valid emails (max 20).
+    @vercel/blob is used so live visitor/enquiry/config JSON can persist. Config, visitors, and enquiries are schema-checked on read. Local JSON is written via a temp file then replaced. Recipients must be valid emails (max 20).
   A04 Cryptographic failures
     Admin session is a random 24-hour HMAC-signed cookie (no disk write). Sender app password is encrypted at rest (AES-256-GCM). The login value the owners type is unchanged.
   A05 Injection
@@ -620,6 +623,7 @@ WORK LOG (13 September 2026)
 - Contact form POSTs /api/contact/ via Nodemailer + Brevo SMTP. From display name A&T, to neeraj@nzaccountingandtax.org, replyTo visitor email, subject ENQUIRY from {firm}. Gmail postreqcli sender removed from sending. HTML email structure (bold 16px labels, 14px values) is unchanged.
 - Contact form first failed (15 September 2026) with Brevo 535 Authentication failed because the SMTP username was the From mailbox neeraj@nzaccountingandtax.org. Client supplied BREVO_SMTP_LOGIN=b95d2e001@smtp-brevo.com. SMTP verify succeeded. Live form submit succeeded and showed “Your enquiry has been submitted.” From stays A&T <BREVO_SMTP_USER>. Failures log enquiry-mail-fail without the key. Mailer uses 15s connection/greeting and 20s socket timeouts. Restart Next.js after changing .env.local.
 - Live /adm/ login (16 September 2026) showed “Something went wrong / The page could not be loaded” after a correct password because setAdminSession wrote data/sessions.json and Vercel’s disk is read-only. Local login worked. Session is now an HMAC-signed cookie only. FORGET PASSWORD was stuck on SENDING because the server action SMTP call could outlast the Hobby limit and useActionState never cleared. It now POSTs /api/adm-recover/ like the contact form; success copy is “The password has been emailed.” Do not mention MD5. Do not put Gmail sending back.
+- Live VISITORS and Form submissions (16 September 2026) stayed empty because addVisitor/addEnquiry wrote data/*.json on a read-only disk. Local logs worked. Live now stores config, visitors, and enquiries in a private Vercel Blob (nzat-admin/…). Localhost still uses data/*.json. Visit logging runs after the page is sent (after()). The Blob store must stay linked to the Vercel project.
 
 --------------------------------------------------------------------------------
 10. FILE MAP
@@ -648,6 +652,7 @@ src/app/layout.tsx                       Fonts, viewport, generateMetadata, Json
 src/app/globals.css                      Palette, phone header/menu :target, 16px inputs, safe-area padding, About 10+ CSS count
 src/proxy.ts                             Passes pathname and visitor IP into the request (Next.js 16 proxy)
 src/lib/site-data.ts                     JSON store: config, visitors, enquiries
+src/lib/persistent-store.ts              Local data/*.json or Vercel Blob on live
 src/lib/admin-recover.ts                 FORGET PASSWORD send + rate limit
 src/app/api/adm-recover/route.ts         POST recover — Brevo SMTP, Node 30s
 src/lib/visit-log.ts                     UA parse, country lookup, flag, recordVisit

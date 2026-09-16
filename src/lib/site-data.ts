@@ -1,5 +1,4 @@
-import { copyFile, mkdir, rename, unlink, writeFile, readFile } from "fs/promises";
-import path from "path";
+import { cache } from "react";
 import {
   clip,
   decryptSecret,
@@ -8,6 +7,11 @@ import {
   isEncryptedSecret,
   isValidEmail,
 } from "@/lib/security";
+import {
+  readJsonStore,
+  updateJsonStore,
+  writeJsonStore,
+} from "@/lib/persistent-store";
 
 export type SiteConfig = {
   offline: boolean;
@@ -52,11 +56,10 @@ const MAX_ENQUIRIES = 500;
 const MAX_RECIPIENTS = 20;
 const MAX_SESSIONS = 8;
 
-const dataDir = path.join(process.cwd(), "data");
-const configPath = path.join(dataDir, "config.json");
-const visitorsPath = path.join(dataDir, "visitors.json");
-const enquiriesPath = path.join(dataDir, "enquiries.json");
-const sessionsPath = path.join(dataDir, "sessions.json");
+const CONFIG_FILE = "config.json";
+const VISITORS_FILE = "visitors.json";
+const ENQUIRIES_FILE = "enquiries.json";
+const SESSIONS_FILE = "sessions.json";
 
 function defaultConfig(): SiteConfig {
   return {
@@ -65,32 +68,6 @@ function defaultConfig(): SiteConfig {
     senderPassword: "",
     enquiryRecipients: [DEFAULT_RECIPIENT],
   };
-}
-
-async function ensureDataDir() {
-  await mkdir(dataDir, { recursive: true });
-}
-
-async function readJson<T>(file: string, fallback: T): Promise<T> {
-  try {
-    const raw = await readFile(file, "utf8");
-    const parsed = JSON.parse(raw) as T;
-    return parsed ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-async function writeJson(file: string, value: unknown) {
-  await ensureDataDir();
-  const tmp = `${file}.${process.pid}.tmp`;
-  await writeFile(tmp, JSON.stringify(value, null, 2), "utf8");
-  try {
-    await rename(tmp, file);
-  } catch {
-    await copyFile(tmp, file);
-    await unlink(tmp).catch(() => undefined);
-  }
 }
 
 function cleanRecipients(value: unknown) {
@@ -103,8 +80,8 @@ function cleanRecipients(value: unknown) {
   return emails.length ? emails : defaultConfig().enquiryRecipients;
 }
 
-export async function getSiteConfig(): Promise<SiteConfig> {
-  const stored = await readJson<Partial<SiteConfig>>(configPath, {});
+export const getSiteConfig = cache(async (): Promise<SiteConfig> => {
+  const stored = await readJsonStore<Partial<SiteConfig>>(CONFIG_FILE, {});
   const base = defaultConfig();
   const senderEmail =
     typeof stored.senderEmail === "string" && isValidEmail(stored.senderEmail)
@@ -118,7 +95,7 @@ export async function getSiteConfig(): Promise<SiteConfig> {
       typeof stored.senderPassword === "string" ? stored.senderPassword : "",
     enquiryRecipients: cleanRecipients(stored.enquiryRecipients),
   };
-}
+});
 
 export async function saveSiteConfig(next: SiteConfig) {
   const senderPassword = next.senderPassword
@@ -127,7 +104,7 @@ export async function saveSiteConfig(next: SiteConfig) {
       : await encryptSecret(next.senderPassword)
     : "";
 
-  await writeJson(configPath, {
+  await writeJsonStore(CONFIG_FILE, {
     offline: Boolean(next.offline),
     senderEmail: isValidEmail(next.senderEmail)
       ? next.senderEmail.trim()
@@ -149,13 +126,12 @@ export async function getMailAccount() {
   };
 }
 
-export async function getVisitors() {
-  const list = await readJson<VisitorRecord[]>(visitorsPath, []);
+export const getVisitors = cache(async () => {
+  const list = await readJsonStore<VisitorRecord[]>(VISITORS_FILE, []);
   return Array.isArray(list) ? list : [];
-}
+});
 
 export async function addVisitor(entry: Omit<VisitorRecord, "id">) {
-  const list = await getVisitors();
   const record: VisitorRecord = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     ip: clip(entry.ip, 64),
@@ -170,7 +146,10 @@ export async function addVisitor(entry: Omit<VisitorRecord, "id">) {
     referrer: clip(entry.referrer, FIELD_LIMITS.referrer),
     path: clip(entry.path, FIELD_LIMITS.path),
   };
-  await writeJson(visitorsPath, [record, ...list].slice(0, MAX_VISITORS));
+  await updateJsonStore<VisitorRecord[]>(VISITORS_FILE, [], (list) => {
+    const current = Array.isArray(list) ? list : [];
+    return [record, ...current].slice(0, MAX_VISITORS);
+  });
 }
 
 export type AdminClearRange = "day" | "week" | "month" | "all";
@@ -188,24 +167,22 @@ function rangeCutoff(range: Exclude<AdminClearRange, "all">) {
 
 export async function clearVisitors(range: AdminClearRange) {
   if (range === "all") {
-    await writeJson(visitorsPath, []);
+    await writeJsonStore(VISITORS_FILE, []);
     return;
   }
   const cutoff = rangeCutoff(range);
-  const list = await getVisitors();
-  await writeJson(
-    visitorsPath,
-    list.filter((visit) => new Date(visit.timestamp).getTime() < cutoff),
-  );
+  await updateJsonStore<VisitorRecord[]>(VISITORS_FILE, [], (list) => {
+    const current = Array.isArray(list) ? list : [];
+    return current.filter((visit) => new Date(visit.timestamp).getTime() < cutoff);
+  });
 }
 
-export async function getEnquiries() {
-  const list = await readJson<EnquiryRecord[]>(enquiriesPath, []);
+export const getEnquiries = cache(async () => {
+  const list = await readJsonStore<EnquiryRecord[]>(ENQUIRIES_FILE, []);
   return Array.isArray(list) ? list : [];
-}
+});
 
 export async function addEnquiry(entry: Omit<EnquiryRecord, "id" | "receivedAt">) {
-  const list = await getEnquiries();
   const record: EnquiryRecord = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     receivedAt: new Date().toISOString(),
@@ -215,29 +192,31 @@ export async function addEnquiry(entry: Omit<EnquiryRecord, "id" | "receivedAt">
     phone: clip(entry.phone, 20),
     requirements: clip(entry.requirements, FIELD_LIMITS.requirements),
   };
-  await writeJson(enquiriesPath, [record, ...list].slice(0, MAX_ENQUIRIES));
+  await updateJsonStore<EnquiryRecord[]>(ENQUIRIES_FILE, [], (list) => {
+    const current = Array.isArray(list) ? list : [];
+    return [record, ...current].slice(0, MAX_ENQUIRIES);
+  });
 }
 
 export async function clearEnquiries(range: AdminClearRange) {
   if (range === "all") {
-    await writeJson(enquiriesPath, []);
+    await writeJsonStore(ENQUIRIES_FILE, []);
     return;
   }
   const cutoff = rangeCutoff(range);
-  const list = await getEnquiries();
-  await writeJson(
-    enquiriesPath,
-    list.filter((item) => new Date(item.receivedAt).getTime() < cutoff),
-  );
+  await updateJsonStore<EnquiryRecord[]>(ENQUIRIES_FILE, [], (list) => {
+    const current = Array.isArray(list) ? list : [];
+    return current.filter((item) => new Date(item.receivedAt).getTime() < cutoff);
+  });
 }
 
 export async function getAdminSessions() {
-  const list = await readJson<AdminSessionRecord[]>(sessionsPath, []);
+  const list = await readJsonStore<AdminSessionRecord[]>(SESSIONS_FILE, []);
   if (!Array.isArray(list)) return [];
   const now = Date.now();
   return list.filter((item) => Date.parse(item.expiresAt) > now);
 }
 
 export async function saveAdminSessions(next: AdminSessionRecord[]) {
-  await writeJson(sessionsPath, next.slice(0, MAX_SESSIONS));
+  await writeJsonStore(SESSIONS_FILE, next.slice(0, MAX_SESSIONS));
 }

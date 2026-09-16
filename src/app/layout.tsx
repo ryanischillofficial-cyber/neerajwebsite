@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { after } from "next/server";
 import { Playfair_Display, Source_Sans_3 } from "next/font/google";
 import { headers } from "next/headers";
 import { JsonLd } from "@/components/JsonLd";
@@ -81,11 +82,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const pathname = headerList.get("x-pathname") ?? "";
   const { offline } = await getSiteConfig();
   const isAdmin = pathname === "/adm" || pathname.startsWith("/adm/");
-  try {
-    await recordVisit(headerList, pathname);
-  } catch {
-    /* visit logging must not block the page */
-  }
+  after(() => {
+    void recordVisit(headerList, pathname).catch(() => undefined);
+  });
 
   return (
     <html
