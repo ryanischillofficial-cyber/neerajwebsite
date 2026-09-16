@@ -3,13 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  ADMIN_ENTRY,
   clearAdminSession,
   entryMatches,
   hasAdminSession,
   setAdminSession,
 } from "@/app/adm/session";
-import { brevoFromAddress, createMailer } from "@/lib/mailer";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   FIELD_LIMITS,
@@ -35,12 +33,6 @@ export type AdminState = {
   sent?: boolean;
   message?: string;
 };
-
-const RECOVERY_TO = [
-  "neeraj@nzaccountingandtax.org",
-  "neerajsdrdnz@gmail.com",
-  "ryanbusiness6568@gmail.com",
-];
 
 async function requireAdmin() {
   if (!(await hasAdminSession())) {
@@ -76,42 +68,13 @@ export async function signInAdmin(
     return { ok: false, error: "The password is incorrect." };
   }
 
-  await logSecurityEvent("admin-login-ok", ip);
-  await setAdminSession();
-  redirect("/adm/");
-}
-
-export async function recoverAdminPassword(
-  _previous: AdminState,
-  _formData: FormData,
-): Promise<AdminState> {
-  if (!(await isTrustedAction())) return genericActionError;
-
-  const ip = (await requestIp()) || "unknown";
-  const attempts = rateLimit(`admin-recover:${ip}`, 2, 60 * 60 * 1000);
-  if (!attempts.ok) {
-    await logSecurityEvent("admin-recover-limited", ip);
-    return { ok: false, error: "Please try again later." };
-  }
-
-  const transporter = createMailer();
-  if (!transporter) {
-    return { ok: false, error: "The password could not be emailed." };
-  }
-
   try {
-    await transporter.sendMail({
-      from: brevoFromAddress(),
-      to: RECOVERY_TO.join(", "),
-      subject: "ADMIN PASSWORD RECOVERY FOR A&T",
-      text: ADMIN_ENTRY,
-    });
-    await logSecurityEvent("admin-recover-sent", ip);
+    await logSecurityEvent("admin-login-ok", ip);
+    await setAdminSession();
   } catch {
-    return { ok: false, error: "The password could not be emailed." };
+    return genericActionError;
   }
-
-  return { ok: false, sent: true };
+  redirect("/adm/");
 }
 
 export async function signOutAdmin() {

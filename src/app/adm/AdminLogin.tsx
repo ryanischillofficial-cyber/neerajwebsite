@@ -1,17 +1,44 @@
 "use client";
 
-import { useActionState } from "react";
-import { recoverAdminPassword, signInAdmin, type AdminState } from "@/app/adm/actions";
+import { useActionState, useState, type FormEvent } from "react";
+import { signInAdmin, type AdminState } from "@/app/adm/actions";
 import { LogoMark } from "@/components/LogoMark";
 
 const initialState: AdminState = { ok: false };
 
 export function AdminLogin() {
   const [state, formAction, pending] = useActionState(signInAdmin, initialState);
-  const [recovery, recoverAction, recovering] = useActionState(
-    recoverAdminPassword,
-    initialState,
-  );
+  const [recovering, setRecovering] = useState(false);
+  const [recoverySent, setRecoverySent] = useState(false);
+  const [recoveryError, setRecoveryError] = useState("");
+
+  async function onRecover(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRecovering(true);
+    setRecoveryError("");
+    setRecoverySent(false);
+    try {
+      const response = await fetch("/api/adm-recover/", {
+        method: "POST",
+        signal: AbortSignal.timeout(35000),
+      });
+      const result = (await response.json()) as {
+        sent?: boolean;
+        error?: string;
+      };
+      if (result.sent) {
+        setRecoverySent(true);
+        return;
+      }
+      setRecoveryError(
+        result.error || "The password could not be emailed.",
+      );
+    } catch {
+      setRecoveryError("The password could not be emailed.");
+    } finally {
+      setRecovering(false);
+    }
+  }
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col items-center justify-center px-5 py-12 sm:py-16">
@@ -58,7 +85,7 @@ export function AdminLogin() {
             </button>
           </form>
 
-          <form action={recoverAction} className="mt-5 text-center">
+          <form onSubmit={onRecover} className="mt-5 text-center">
             <button
               type="submit"
               disabled={recovering}
@@ -66,14 +93,14 @@ export function AdminLogin() {
             >
               {recovering ? "SENDING" : "FORGET PASSWORD"}
             </button>
-            {recovery.sent ? (
+            {recoverySent ? (
               <p className="mt-3 text-sm text-muted" role="status">
                 The password has been emailed.
               </p>
             ) : null}
-            {recovery.error ? (
+            {recoveryError ? (
               <p className="mt-3 text-sm text-ink" role="alert">
-                {recovery.error}
+                {recoveryError}
               </p>
             ) : null}
           </form>

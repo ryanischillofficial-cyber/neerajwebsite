@@ -4,6 +4,7 @@ import { AdminLogin } from "@/app/adm/AdminLogin";
 import { hasAdminSession } from "@/app/adm/session";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export const metadata: Metadata = {
   title: "Admin",

@@ -1,14 +1,11 @@
-import { createHash, randomBytes, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
-import {
-  getAdminSessions,
-  saveAdminSessions,
-} from "@/lib/site-data";
+import { getAppSecret } from "@/lib/app-secret";
 
 export const ADMIN_ENTRY = "5095fbbd658e0cf115c0935562225794";
 export const ADMIN_COOKIE = "adm";
 
-const SESSION_MS = 60 * 60 * 24;
+const SESSION_MS = 60 * 60 * 24 * 1000;
 
 function sameValue(left: string, right: string) {
   const a = Buffer.from(left);
@@ -16,8 +13,8 @@ function sameValue(left: string, right: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function hashToken(token: string) {
-  return createHash("sha256").update(token).digest("hex");
+function sign(secret: string, token: string, expires: string) {
+  return createHmac("sha256", secret).update(`${token}.${expires}`).digest("hex");
 }
 
 export function entryMatches(input: string) {
@@ -26,29 +23,28 @@ export function entryMatches(input: string) {
 
 export async function hasAdminSession() {
   const jar = await cookies();
-  const token = jar.get(ADMIN_COOKIE)?.value;
-  if (!token || token.length < 32) return false;
+  const value = jar.get(ADMIN_COOKIE)?.value;
+  if (!value) return false;
 
-  const hash = hashToken(token);
-  const sessions = await getAdminSessions();
-  return sessions.some((session) => sameValue(session.hash, hash));
+  const parts = value.split(".");
+  if (parts.length !== 3) return false;
+  const [token, expires, sig] = parts;
+  if (!token || !/^\d+$/.test(expires) || !sig) return false;
+  if (Date.now() > Number(expires)) return false;
+
+  const secret = await getAppSecret();
+  const expected = sign(secret, token, expires);
+  return sameValue(sig, expected);
 }
 
 export async function setAdminSession() {
+  const secret = await getAppSecret();
   const token = randomBytes(32).toString("hex");
-  const now = new Date();
-  const expires = new Date(now.getTime() + SESSION_MS);
-
-  await saveAdminSessions([
-    {
-      hash: hashToken(token),
-      createdAt: now.toISOString(),
-      expiresAt: expires.toISOString(),
-    },
-  ]);
+  const expires = String(Date.now() + SESSION_MS);
+  const value = `${token}.${expires}.${sign(secret, token, expires)}`;
 
   const jar = await cookies();
-  jar.set(ADMIN_COOKIE, token, {
+  jar.set(ADMIN_COOKIE, value, {
     httpOnly: true,
     sameSite: "strict",
     path: "/adm",
@@ -59,13 +55,5 @@ export async function setAdminSession() {
 
 export async function clearAdminSession() {
   const jar = await cookies();
-  const token = jar.get(ADMIN_COOKIE)?.value;
-  if (token) {
-    const hash = hashToken(token);
-    const sessions = await getAdminSessions();
-    await saveAdminSessions(
-      sessions.filter((session) => !sameValue(session.hash, hash)),
-    );
-  }
   jar.delete({ name: ADMIN_COOKIE, path: "/adm" });
 }

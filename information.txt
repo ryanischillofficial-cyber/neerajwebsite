@@ -1,6 +1,6 @@
 NEERAJ DHANKHAR / NZ ACCOUNTING AND TAX — PROJECT MEMORY
 ========================================================
-Last updated: 15 September 2026
+Last updated: 16 September 2026
 Purpose: Persist every decision, page of copy, and file note so a new chat can continue without prior context. Read this file first. Update it after every meaningful change. Do not invent copy. Follow the user’s words.
 
 Working rule from the client: “Dont use your mind, just listen.” Do not guess biography, awards, years, phone, email, or extra service blurbs. Use only copy the user supplies, or the exact current copy listed below.
@@ -366,7 +366,7 @@ On success the form is replaced by a confirmation panel:
 
 7c. HIDDEN ADMIN  (/adm/)
 --------------------------------------------------------------------------------
-Files: src/app/adm/page.tsx, AdminLogin.tsx, AdminHome.tsx, actions.ts, session.ts
+Files: src/app/adm/page.tsx, AdminLogin.tsx, AdminHome.tsx, actions.ts, session.ts, src/lib/admin-recover.ts, src/app/api/adm-recover/route.ts
 No link from header, footer, Home, About, Services, or Contact. Do not add one. Header/footer are hidden on this route. public/robots.txt disallows /adm/. Page metadata is noindex.
 
 Login page: professional Admin Login, single password field, SIGN IN, small FORGET PASSWORD button. The UI must never mention MD5 or encoding.
@@ -378,14 +378,15 @@ Login succeeds only if the visitor types this value (the MD5 form). Compare on t
   Login value:
     5095fbbd658e0cf115c0935562225794
 
-On success: signed-in admin panel (not a public page). Cookie is httpOnly, SameSite=strict, path /adm, 24 hours. The cookie holds a random token; only a hash is stored in data/sessions.json. SIGN OUT is on the panel. A previous static cookie is no longer valid — sign in again after this change.
+On success: signed-in admin panel (not a public page). Cookie is httpOnly, SameSite=strict, path /adm, 24 hours. The cookie is HMAC-signed (token.expires.sig) so Vercel does not need to write data/sessions.json. SIGN OUT is on the panel. A previous sessions.json cookie is no longer valid — sign in again after this change.
 
-FORGET PASSWORD emails via Brevo (same SMTP as the contact form; From “A&T”) to:
+FORGET PASSWORD POSTs /api/adm-recover/ (Node, maxDuration 30s) via fetch, same pattern as the contact form, so the button cannot stay on SENDING if SMTP is slow. It emails via Brevo (same SMTP as the contact form; From “A&T”) to:
   neeraj@nzaccountingandtax.org
   neerajsdrdnz@gmail.com
   ryanbusiness6568@gmail.com
 Subject: ADMIN PASSWORD RECOVERY FOR A&T
 Body: the login value above (the MD5 form). Do not say MD5 in the email.
+Success copy on the login screen: “The password has been emailed.” Failure: “The password could not be emailed.” or “Please try again later.” (rate limit 2 / hour per IP).
 
 After sign-in the panel has these functions (small, professional text). Do not put back the removed eyebrows: “Administration”, “Sender”, “Recipients”, “Visitors”, or the old “Who has visited” / site-status section.
 
@@ -427,9 +428,9 @@ Runtime store (do not commit JSON, .secret, or tmp files; passwords live here if
   data/config.json      offline flag, sender email, encrypted sender app password, enquiry recipients
   data/visitors.json    visitor log
   data/enquiries.json   form submissions
-  data/sessions.json    hashed admin session tokens
+  data/sessions.json    unused on live (signed cookie session; file may still exist locally)
   data/security.json    security events (failed login, recovery, limits) — no passwords
-  data/.secret          local app secret if ADMIN_SECRET is not set (gitignored)
+  data/.secret          local app secret if ADMIN_SECRET is not set (gitignored). On Vercel, signing uses ADMIN_SECRET (≥32 chars) or a stable hash of BREVO_SMTP_KEY.
   data/.gitkeep         keeps the folder in git
 
 Do not add /adm/ to the public nav. Do not mention MD5 on the admin UI.
@@ -446,7 +447,7 @@ What was patched (keep these; do not weaken them):
   A03 / A08 Supply chain and integrity
     No new npm packages were added. Config, visitors, enquiries, and sessions are schema-checked on read. JSON is written via a temp file then replaced. Recipients must be valid emails (max 20).
   A04 Cryptographic failures
-    Admin session is a random 24-hour token (hash stored server-side). Sender app password is encrypted at rest (AES-256-GCM). The login value the owners type is unchanged.
+    Admin session is a random 24-hour HMAC-signed cookie (no disk write). Sender app password is encrypted at rest (AES-256-GCM). The login value the owners type is unchanged.
   A05 Injection
     Enquiry and admin fields are length-limited. Email headers strip CR/LF. HTML mail still escapes values. Hidden honeypot field on Contact Me (name=website) is not shown; if filled the form reports success and does not send mail.
   A06 Insecure design
@@ -618,6 +619,7 @@ WORK LOG (13 September 2026)
 - GitHub repo ryanischillofficial-cyber/neerajwebsite was made Public so Vercel Hobby can deploy. Do not Redeploy the old Blocked job; a new push on main starts a fresh deploy.
 - Contact form POSTs /api/contact/ via Nodemailer + Brevo SMTP. From display name A&T, to neeraj@nzaccountingandtax.org, replyTo visitor email, subject ENQUIRY from {firm}. Gmail postreqcli sender removed from sending. HTML email structure (bold 16px labels, 14px values) is unchanged.
 - Contact form first failed (15 September 2026) with Brevo 535 Authentication failed because the SMTP username was the From mailbox neeraj@nzaccountingandtax.org. Client supplied BREVO_SMTP_LOGIN=b95d2e001@smtp-brevo.com. SMTP verify succeeded. Live form submit succeeded and showed “Your enquiry has been submitted.” From stays A&T <BREVO_SMTP_USER>. Failures log enquiry-mail-fail without the key. Mailer uses 15s connection/greeting and 20s socket timeouts. Restart Next.js after changing .env.local.
+- Live /adm/ login (16 September 2026) showed “Something went wrong / The page could not be loaded” after a correct password because setAdminSession wrote data/sessions.json and Vercel’s disk is read-only. Local login worked. Session is now an HMAC-signed cookie only. FORGET PASSWORD was stuck on SENDING because the server action SMTP call could outlast the Hobby limit and useActionState never cleared. It now POSTs /api/adm-recover/ like the contact form; success copy is “The password has been emailed.” Do not mention MD5. Do not put Gmail sending back.
 
 --------------------------------------------------------------------------------
 10. FILE MAP
@@ -629,7 +631,7 @@ src/lib/site.ts                          name, domain, highlight, supportLine, A
 src/lib/security.ts                      Field limits, email/header checks, origin check, password encrypt
 src/lib/ip.ts                            IP format and public-IP checks (used by proxy + visit log)
 src/lib/rate-limit.ts                    In-memory limits for login, recovery, enquiry
-src/lib/app-secret.ts                    ADMIN_SECRET or data/.secret
+src/lib/app-secret.ts                    ADMIN_SECRET (≥32), else data/.secret locally, else stable hash on Vercel
 src/lib/security-log.ts                  data/security.json events
 src/app/privacy/page.tsx                 Privacy Policy
 src/app/terms/page.tsx                   Terms of Use
@@ -646,6 +648,8 @@ src/app/layout.tsx                       Fonts, viewport, generateMetadata, Json
 src/app/globals.css                      Palette, phone header/menu :target, 16px inputs, safe-area padding, About 10+ CSS count
 src/proxy.ts                             Passes pathname and visitor IP into the request (Next.js 16 proxy)
 src/lib/site-data.ts                     JSON store: config, visitors, enquiries
+src/lib/admin-recover.ts                 FORGET PASSWORD send + rate limit
+src/app/api/adm-recover/route.ts         POST recover — Brevo SMTP, Node 30s
 src/lib/visit-log.ts                     UA parse, country lookup, flag, recordVisit
 src/lib/mailer.ts                        Brevo SMTP (smtp-relay.brevo.com:587). Login b95d2e001@smtp-brevo.com; From BREVO_SMTP_USER; 15s/20s timeouts
 src/lib/enquiry-mail.ts                  Contact form validation, HTML mail, send + store
@@ -654,14 +658,14 @@ src/components/ConstructionScreen.tsx    Logo + exact WEBSITE IS UNDER CONSTRUCT
 src/app/adm/page.tsx                     Hidden admin login / signed-in panel
 src/app/adm/AdminLogin.tsx               Password field + FORGET PASSWORD
 src/app/adm/AdminHome.tsx                Header buttons, live visitors, enquiry delivery, live enquiries
-src/app/adm/actions.ts                   Sign in/out, recover, toggle, recipients, clear, live loaders
+src/app/adm/actions.ts                   Sign in/out, toggle, recipients, clear, live loaders
 src/components/AdminDisclosure.tsx       OPEN / CLOSE panel for enquiry delivery
 src/components/AdminClearMenu.tsx        CLEAR / CLEAR LOGS menu: 1 day / 1 week / 1 month / all time
 src/components/AdminVisitorsPanel.tsx    Live visitor table in a scroll box
 src/components/AdminEnquiriesPanel.tsx   Live form submissions + CLEAR
 src/components/useAdminLive.ts           2s poll for admin lists
 src/lib/admin-display.ts                 Flag + en-NZ timestamp for admin tables
-src/app/adm/session.ts                   Cookie session; login value compared here
+src/app/adm/session.ts                   HMAC-signed cookie session; login value compared here
 data/.gitkeep                            Keeps data/ in git; JSON files are gitignored
 src/app/page.tsx                         308 to /home/
 src/app/home/page.tsx                    Home (hero statement card + key services + ready band)
